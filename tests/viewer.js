@@ -1,12 +1,12 @@
 // Set the color of all polygons in this solid
-CSG.prototype.setColor = function(r, g, b) {
+CSG.prototype.setColor = CSG2.prototype.setColor = function(r, g, b) {
   this.toPolygons().map(function(polygon) {
     polygon.shared = [r, g, b];
   });
 };
 
 // Convert from CSG solid to GL.Mesh object
-CSG.prototype.toMesh = function() {
+CSG.prototype.toMesh = CSG2.prototype.toMesh = function() {
   var mesh = new GL.Mesh({ normals: true, colors: true });
   var indexer = new GL.Indexer();
   this.toPolygons().map(function(polygon) {

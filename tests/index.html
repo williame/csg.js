@@ -2,6 +2,7 @@
 <html><head>
   <script src="lightgl.js"></script>
   <script src="../csg.js"></script>
+  <script src="../csg2.js"></script>
   <script src="viewer.js"></script>
   <style>
 
@@ -155,19 +156,27 @@ for (var i = 0; i < operations.length; i++) {
 
 // Set up interactive demo
 var tryit = document.getElementById('tryit');
+var lasttry = "";
 var timeout = null;
 var viewer = new Viewer(new CSG(), 400, 400, 5);
 addViewer(viewer);
 function rebuild() {
   var error = document.getElementById('error');
-  try {
-    var solid = new Function(tryit.value)();
-    error.innerHTML = '';
-  } catch (e) {
-    error.innerHTML = 'Error: <code>' + e.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+  var source = tryit.value.replace(/\s+/g,'`').replace(/``/g,'`').replace(/`/g,' ');
+  if(lasttry != source) {
+    lasttry = source;
+    try {
+      var start = new Date().getTime();
+      var solid = new Function(tryit.value)();
+      error.innerHTML = '<i>(took '+(new Date().getTime() - start)+' ms)</i>';
+    } catch (e) {
+      error.innerHTML = 'Error: <code>' + e.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+    }
+    if(solid) {
+      viewer.mesh = solid.toMesh();
+      viewer.gl.ondraw();
+    }
   }
-  viewer.mesh = solid.toMesh();
-  viewer.gl.ondraw();
 }
 tryit.onkeydown = function() {
   if (timeout) clearTimeout(timeout);

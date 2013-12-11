@@ -1,0 +1,37 @@
+<html>
+<head>
+<title>Benchmarking csg.js</title>
+<script src="../../csg.js"></script>
+<script src="../../csg2.js"></script>
+<script src="benchmark.js"></script>
+<script type="text/javascript">
+
+function run_perf_test() {
+
+	var log = function(msg) {
+		console.log(msg);
+		document.getElementById("out").innerHTML += "<div>"+msg+"</div>";
+	};
+
+	var suite = new Benchmark.Suite;
+	suite.add('CSG2 cube-sphere(50/50)', function() {
+		var a = CSG2.cube();
+		var b = CSG2.sphere({ radius: 1.35, stacks:50, slices:50, });
+		a.subtract(b);
+	});
+	suite.add('CSG cube-sphere(50/50)', function() {
+		var a = CSG.cube();
+		var b = CSG.sphere({ radius: 1.35, stacks:50, slices:50, });
+		a.subtract(b);
+	});
+	suite.on('cycle', function(event) { log(String(event.target)); });
+	suite.on('complete', function() { log("Done."); });
+	suite.run({ 'async': true });
+}
+
+</script>
+</head>
+<body onload="run_perf_test()">
+<div id="out"></div>
+</body>
+</html>
