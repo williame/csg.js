@@ -175,6 +175,8 @@ function rebuild() {
     if(solid) {
       viewer.mesh = solid.toMesh();
       viewer.gl.ondraw();
+      if(solid.trivia)
+      	error.innerHTML += " " + solid.trivia();
     }
   }
 }

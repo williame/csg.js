@@ -48,7 +48,7 @@
 // Holds a binary space partition tree representing a 3D solid. Two solids can
 // be combined using the `union()`, `subtract()`, and `intersect()` methods.
 
-CSG2 = function() {
+var CSG2 = function() {
   this.polygons = null;
   this.bsp = null;
   this.bounds = null;
@@ -91,15 +91,31 @@ CSG2.prototype = {
   clone: function() {
     var csg = new CSG2();
     if(this.polygons) csg.polygons = this.polygons.map(function(p) { return p.clone(); });
-    if(this.bsp) csg.bsp = this.bsp;
-    if(this.bounds) csg.bounds = this.bounds;
+    if(this.bsp) csg.bsp = this.bsp.clone();
+    //if(this.bounds) csg.bounds = this.bounds;
     return csg;
   },
 
   toPolygons: function() {
     if(!this.polygons)
-      this.polygons = this.bsp.allPolygons();
+      this.polygons = this.bsp? this.bsp.allPolygons(): [];
     return this.polygons;
+  },
+  
+  scale: function(s) {
+    var polygons = this.toPolygons().map(function(p) {
+        var vertices = p.vertices.map(function(v) { return new CSG2.Vertex(v.pos.scale(s),v.normal); });
+        return new CSG2.Polygon(vertices,p.shared);
+    });
+    return CSG2.fromPolygons(polygons);
+  },
+
+  translate: function(t) {
+    var polygons = this.toPolygons().map(function(p) {
+        var vertices = p.vertices.map(function(v) { return new CSG2.Vertex(v.pos.translate(t),v.normal); });
+        return new CSG2.Polygon(vertices,p.shared);
+    });
+    return CSG2.fromPolygons(polygons);
   },
   
   getBounds: function() {
@@ -113,6 +129,53 @@ CSG2.prototype = {
     	    }
     }
     return this.bounds;
+  },
+  
+  tidy: function() {
+    var triangles = [], polygons = this.toPolygons();
+    for(var p in polygons) {
+      var vertices = polygons[p].vertices;
+      for(var v=2; v<vertices.length; v++)
+        triangles.push(vertices[0],vertices[v-1],vertices[v]);
+    }
+    var vertices = [], index = {}, indices = [], neighbours = [];
+    for(var v in triangles) {
+      v = triangles[v];
+      var key = ""+v.pos.x+"/"+v.pos.y+"/"+v.pos.z+" "+""+v.normal.x+"/"+v.normal.y+"/"+v.normal.z;
+      if(!(key in index)) {
+        index[key] = vertices.length;
+        indices.push(vertices.length);
+        vertices.push(v);
+        neighbours.push([]);
+      } else
+        indices.push(index[key]);
+    }
+    for(var t=0; t<indices.length; t+=3) {
+      var a = indices[t], b = indices[t+1], c = indices[t+2];
+      neighbours[a].push(b);
+      neighbours[a].push(c);
+      neighbours[b].push(a);
+      neighbours[b].push(c);
+      neighbours[c].push(a);
+      neighbours[c].push(b);
+    }
+    console.log("neighbours",neighbours);
+    return ""+vertices.length+" vertices, "+(indices.length/3)+" triangles";
+  },
+  
+  triviax: function() {
+    var lengths = {}, polygons = this.toPolygons(), triangles = 0;
+    for(var p in polygons) {
+      var length = polygons[p].vertices.length;
+      lengths[length] = (lengths[length] || 0) + 1;
+      triangles += length-2;
+    }
+    var s = "";
+    for(var l in lengths) {
+      if(s.length) s += ",";
+      s += l+"="+lengths[l];
+    }
+    return ""+triangles+" triangles; "+s+" -> "+this.tidy();
   },
   
   getBSP: function() {
@@ -136,8 +199,8 @@ CSG2.prototype = {
   //          +-------+            +-------+
   // 
   union: function(csg) {
-    var a = this.getBSP();
-    var b = csg.getBSP();
+    var a = this.clone().getBSP();
+    var b = csg.clone().getBSP();
     a.clipTo(b);
     b.clipTo(a);
     b.invert();
@@ -162,8 +225,8 @@ CSG2.prototype = {
   //          +-------+
   // 
   subtract: function(csg) {
-    var a = this.getBSP();
-    var b = csg.getBSP();
+    var a = this.clone().getBSP();
+    var b = csg.clone().getBSP();
     a.invert();
     a.clipTo(b);
     b.clipTo(a);
@@ -190,8 +253,8 @@ CSG2.prototype = {
   //          +-------+
   // 
   intersect: function(csg) {
-    var a = this.getBSP();
-    var b = csg.getBSP();
+    var a = this.clone().getBSP();
+    var b = csg.clone().getBSP();
     a.invert();
     b.clipTo(a);
     b.invert();
@@ -304,7 +367,7 @@ CSG2.sphere = function(options) {
     var slices = options.slices || 16;
     var stacks = options.stacks || 8;
     var vertices;
-    function vertex(theta, phi) {
+    var vertex = function(theta, phi) {
       theta *= Math.PI * 2;
       phi *= Math.PI;
       var dir = new CSG2.Vector(
@@ -420,6 +483,14 @@ CSG2.Vector.prototype = {
   times: function(a) {
     return new CSG2.Vector(this.x * a, this.y * a, this.z * a);
   },
+  
+  scale: function(s) {
+    return new CSG2.Vector(this.x * s.x, this.y * s.y, this.z * s.z);
+  },
+  
+  translate: function(t) {
+    return new CSG2.Vector(this.x + t.x, this.y + t.y, this.z + t.z);
+  },
 
   dividedBy: function(a) {
     return new CSG2.Vector(this.x / a, this.y / a, this.z / a);
@@ -433,10 +504,15 @@ CSG2.Vector.prototype = {
     return this.plus(a.minus(this).times(t));
   },
 
-  length: function() {
-    return Math.sqrt(this.dot(this));
+  distance: function(a) {
+    return this.minus(a).length();
   },
 
+  length: function() {
+    var dot = this.dot(this);
+    return dot? Math.sqrt(dot): 0;
+  },
+  
   unit: function() {
     return this.dividedBy(this.length());
   },
@@ -616,9 +692,23 @@ CSG2.Node = function(polygons, plane) {
 };
 
 CSG2.Node.fromPolygons = function(polygons,bounds) {
+	if(!polygons || !polygons.length)
+		return new CSG2.Node();
 	if(!bounds) bounds = CSG2.getBounds(polygons);
-	var centre = bounds.max.minus(bounds.min).times(0.5);
-	return new CSG2.Node(polygons,new CSG2.Plane(centre,centre.length()));
+	var centre = bounds.min.lerp(bounds.max,0.5);
+	var a = new CSG2.Plane(new CSG2.Vector(1,0,0),centre.x);
+	var b = new CSG2.Plane(new CSG2.Vector(0,1,0),centre.y);
+	var c = new CSG2.Plane(new CSG2.Vector(0,0,1),centre.z);
+	var split = function(node,plane) {
+		node.front = new CSG2.Node(null,plane.clone());
+		node.back = new CSG2.Node(null,plane.clone());
+	};
+	var root = new CSG2.Node(null,a);
+	split(root,b);
+	split(root.front,c);
+	split(root.back,c);
+	root.build(polygons);
+	return root;
 }
 
 CSG2.Node.prototype = {

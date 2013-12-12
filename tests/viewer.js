@@ -25,6 +25,8 @@ CSG.prototype.toMesh = CSG2.prototype.toMesh = function() {
   return mesh;
 };
 
+CSG = CSG2; //###
+
 var angleX = 20;
 var angleY = 20;
 var viewers = [];
