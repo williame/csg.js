@@ -3,6 +3,7 @@ CSG.prototype.setColor = CSG2.prototype.setColor = function(r, g, b) {
   this.toPolygons().map(function(polygon) {
     polygon.shared = [r, g, b];
   });
+  return this;
 };
 
 // Convert from CSG solid to GL.Mesh object
@@ -24,8 +25,6 @@ CSG.prototype.toMesh = CSG2.prototype.toMesh = function() {
   mesh.computeWireframe();
   return mesh;
 };
-
-CSG = CSG2; //###
 
 var angleX = 20;
 var angleY = 20;
